@@ -23,6 +23,8 @@ sub new {
         topic_counts      => [],
         # row: document, col: term, val: topic
         doc_term_topic    => [],
+        # term count in each documents
+        term_counts       => [],
         # term index
         term_index        => {},
     }, $class;
@@ -78,6 +80,17 @@ sub _initialize_doc_topic_counts {
         my $topic_counts = $self->create_matrix(1, $self->{topic_num}, $self->{alpha});
         $topic_counts->[$_] += 1 for @$topics;
         push @{$self->{doc_topic_counts}}, $topic_counts;
+    }
+}
+
+sub _initialize_term_counts {
+    my $self = shift;
+    $self->{term_counts} = $self->create_matrix(
+        1, scalar @{$self->{docs}}, $self->{alpha} * $self->{topic_num}
+    );
+    foreach my $doc_index ( 0 .. $#{$self->{docs}} ) {
+        my $term_count = scalar @{$self->{docs}->[$doc_index]};
+        $self->{term_counts}->[$doc_index] += $term_count;
     }
 }
 
@@ -172,6 +185,7 @@ sub decrement {
     $self->{doc_topic_counts}->[$doc_index]->[$topic_index] -= 1;
     $self->{topic_term_counts}->[$topic_index]->[$term_index] -= 1;
     $self->{topic_counts}->[$topic_index] -= 1;
+    $self->{term_counts}->[$doc_index] -= 1;
 }
 
 sub increment {
@@ -179,6 +193,7 @@ sub increment {
     $self->{doc_topic_counts}->[$doc_index]->[$topic_index] += 1;
     $self->{topic_term_counts}->[$topic_index]->[$term_index] += 1;
     $self->{topic_counts}->[$topic_index] += 1;
+    $self->{term_counts}->[$doc_index] += 1;
 }
 
 sub multinomial_sampling {
@@ -189,7 +204,7 @@ sub multinomial_sampling {
     for my $topic_index ( 0 .. $self->{topic_num} - 1 ) {
         my $prob = $self->{doc_topic_counts}->[$doc_index]->[$topic_index] *
             $self->{topic_term_counts}->[$topic_index]->[$term_index] /
-                $self->{topic_counts}->[$topic_index];
+                ($self->{topic_counts}->[$topic_index] * $self->{term_counts}->[$doc_index]);
         $total_prob += $prob;
         return $topic_index if $rand_prob < $total_prob;
     }
