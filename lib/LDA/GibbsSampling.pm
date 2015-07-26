@@ -61,6 +61,7 @@ sub initialize {
     $self->create_term_index;
     $self->_initialize_doc_term_topic;
     $self->_initialize_doc_topic_counts;
+    $self->_initialize_term_counts;
     $self->_initialize_topic_term_counts;
     $self->_initialize_topic_counts;
 }
@@ -199,14 +200,19 @@ sub increment {
 sub multinomial_sampling {
     my ($self, $doc_index, $term_index) = @_;
     my $total_prob = 0;
-    my $rand_prob = rand(1);
-
+    my @probs;
     for my $topic_index ( 0 .. $self->{topic_num} - 1 ) {
         my $prob = $self->{doc_topic_counts}->[$doc_index]->[$topic_index] *
             $self->{topic_term_counts}->[$topic_index]->[$term_index] /
                 ($self->{topic_counts}->[$topic_index] * $self->{term_counts}->[$doc_index]);
         $total_prob += $prob;
-        return $topic_index if $rand_prob < $total_prob;
+        push @probs, $prob;
+    }
+
+    my $rand_prob = rand($total_prob);
+    for my $topic_index ( 0 .. $self->{topic_num} - 1 ) {
+        $rand_prob -= $probs[$topic_index];
+        return $topic_index if $rand_prob < 0;
     }
     return $self->{topic_num} - 1;
 }
